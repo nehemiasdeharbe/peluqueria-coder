@@ -38,9 +38,22 @@ export default class ServiceManager {
       return value === undefined || value === null || value === '';
     });
   }
+  
+  async getServices({ category, available } = {}) {
+    let services = await this.#readServices();
 
-  async getServices() {
-    return this.#readServices();
+    if (category !== undefined) {
+      services = services.filter(
+        (s) => String(s.category).toLowerCase() === String(category).toLowerCase()
+      );
+    }
+
+    if (available !== undefined) {
+      const wanted = String(available) === 'true';
+      services = services.filter((s) => s.available === wanted);
+    }
+
+    return services;
   }
 
   async getServiceById(id) {

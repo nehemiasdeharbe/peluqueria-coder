@@ -13,7 +13,7 @@ function validateEnv() {
   if (missing.length > 0) {
     console.error(
       `[env.config] Faltan variables de entorno requeridas: ${missing.join(', ')}.\n` +
-      'Creá un archivo .env basado en .env_example antes de iniciar la app.'
+      'Creá un archivo .env basado en .env.example antes de iniciar la app.'
     );
     process.exit(1);
   }

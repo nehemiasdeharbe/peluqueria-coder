@@ -1,62 +1,42 @@
-# Peluquería Coder - Administrador de servicios
+# Peluquería Coder - API REST de servicios
 
-API en Node.js con ESM que implementa un administrador de servicios (`ServiceManager`) para un sistema de turnos y reservas de una peluquería, expuesto mediante rutas de Express.
-
-## Descripción
-
-La aplicación gestiona el recurso **services** (servicios ofrecidos por la peluquería: cortes, manicura, etc.): listarlos, buscarlos por id, crearlos, actualizarlos y eliminarlos. Los datos se persisten en un archivo JSON (`src/data/services.json`).
+API REST con Node.js, Express y ESM para gestionar el recurso `services` del Sistema Backend de Turnos y Reservas de una peluquería. Las rutas se conectan con la clase `ServiceManager`, que guarda los datos en un archivo JSON.
 
 ## Instalación
 
-1. Cloná el repositorio:
-
-   ```bash
-   git clone https://github.com/<tu-usuario>/peluqueria-coder.git
-   cd peluqueria-coder
-   ```
-
-2. Instalá las dependencias:
-
-   ```bash
-   npm install
-   ```
-
-3. Creá tu archivo `.env` a partir de `.env_example`:
-
-   ```bash
-   cp .env_example .env
-   ```
-
-   Completá los valores (ver sección de variables de entorno).
-
-## Ejecución
-
 ```bash
-node src/app.js
+git clone https://github.com/nehemiasdeharbe/peluqueria-coder.git
+cd peluqueria-coder
+npm install
+cp .env.example .env
 ```
 
-O, si agregaste el script en `package.json`:
+Completá los valores del `.env` (ver sección siguiente).
+
+## Ejecución
 
 ```bash
 npm start
 ```
 
-Al iniciar, `src/config/env.config.js` valida que existan las variables de entorno requeridas. Si falta alguna, la aplicación no arranca y muestra un mensaje indicando cuáles faltan.
+Modo desarrollo (reinicia al guardar cambios):
 
-Una vez arriba, el servidor queda escuchando en `http://localhost:<PORT>`.
+```bash
+npm run dev
+```
+
+El servidor queda en `http://localhost:<PORT>`.
 
 ## Variables de entorno
 
-| Variable    | Descripción                              | Ejemplo       |
-|-------------|-------------------------------------------|---------------|
-| `PORT`      | Puerto en el que corre la aplicación      | `8082`        |
-| `NODE_ENV`  | Entorno de ejecución                      | `development` |
+| Variable   | Descripción                         | Ejemplo       |
+|------------|--------------------------------------|---------------|
+| `PORT`     | Puerto en el que corre el servidor   | `8082`        |
+| `NODE_ENV` | Entorno de ejecución                 | `development` |
 
-Se definen en un archivo `.env` (no incluido en el repositorio). Usar `.env_example` como plantilla.
+Si falta alguna, la app no arranca y muestra un mensaje indicando cuál.
 
-## Recurso: `services`
-
-Cada servicio tiene la siguiente forma:
+## Recurso `services`
 
 ```js
 {
@@ -70,74 +50,83 @@ Cada servicio tiene la siguiente forma:
 }
 ```
 
-## Endpoints (Express)
+## Endpoints
 
-| Método | Ruta                  | Descripción                          |
-|--------|------------------------|---------------------------------------|
-| GET    | `/api/services`         | Devuelve todos los servicios          |
-| GET    | `/api/services/:id`     | Devuelve un servicio por id           |
-| POST   | `/api/services`         | Crea un nuevo servicio                |
-| PUT    | `/api/services/:id`     | Actualiza un servicio existente       |
-| DELETE | `/api/services/:id`     | Elimina un servicio                   |
+| Método | Ruta                    | Descripción                                  | Códigos          |
+|--------|-------------------------|-----------------------------------------------|------------------|
+| GET    | `/api/services`         | Lista los servicios (acepta filtros)          | 200, 400         |
+| GET    | `/api/services/:sid`    | Devuelve un servicio por id                   | 200, 404         |
+| POST   | `/api/services`         | Crea un servicio (el id se genera solo)       | 201, 400         |
+| PUT    | `/api/services/:sid`    | Actualiza un servicio (el id no se modifica)  | 200, 404         |
+| DELETE | `/api/services/:sid`    | Elimina un servicio                           | 200, 404         |
 
-## Uso de `ServiceManager`
+### Filtros (query params) en `GET /api/services`
 
-```js
-import ServiceManager from './src/managers/ServiceManager.js';
+- `category`: filtra por categoría. Ej: `/api/services?category=estetica`
+- `available`: `true` o `false`. Ej: `/api/services?available=true`
+- Se pueden combinar: `/api/services?category=peluqueria&available=true`
 
-const serviceManager = new ServiceManager();
+Si `available` tiene un valor distinto de `true` o `false`, responde `400`.
 
-// Obtener todos los servicios
-const services = await serviceManager.getServices();
+## Ejemplos
 
-// Obtener un servicio por id
-const service = await serviceManager.getServiceById(1);
-// -> devuelve el servicio o null si no existe
+Crear un servicio (no se envía `id`):
 
-// Agregar un nuevo servicio (el id se genera automáticamente)
-const newService = await serviceManager.addService({
-  name: 'Depilación',
-  description: 'Depilación con cera',
-  duration: 40,
-  price: 5000,
-  category: 'estetica',
-  available: true,
-});
-// -> lanza un error si falta algún campo requerido (name, description, duration, price, category, available)
-
-// Actualizar un servicio existente (no se puede modificar el id)
-const updated = await serviceManager.updateService(newService.id, {
-  price: 5500,
-});
-// -> devuelve null si el servicio no existe
-
-// Eliminar un servicio
-const deleted = await serviceManager.deleteService(newService.id);
-// -> devuelve null si el servicio no existe
+```bash
+curl -X POST http://localhost:8082/api/services \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Tintura","description":"Coloración completa","duration":90,"price":9000,"category":"peluqueria","available":true}'
 ```
 
-## Estructura del proyecto
+Respuesta `201`:
+
+```json
+{
+  "id": 4,
+  "name": "Tintura",
+  "description": "Coloración completa",
+  "duration": 90,
+  "price": 9000,
+  "category": "peluqueria",
+  "available": true
+}
+```
+
+Si faltan campos, responde `400`:
+
+```json
+{ "error": "No se pudo crear el servicio, faltan campos requeridos: description, duration, price, category, available" }
+```
+
+Actualizar un servicio:
+
+```bash
+curl -X PUT http://localhost:8082/api/services/1 \
+  -H "Content-Type: application/json" \
+  -d '{"price":4200}'
+```
+
+Eliminar un servicio:
+
+```bash
+curl -X DELETE http://localhost:8082/api/services/4
+```
+
+## Estructura
 
 ```
 src/
   config/
-    env.config.js      # Carga y valida variables de entorno
+    env.config.js          # Carga y valida variables de entorno
   managers/
-    ServiceManager.js  # Lógica de negocio de los servicios
+    ServiceManager.js      # Lógica de negocio (CRUD y filtros)
   data/
-    services.json       # Persistencia de los servicios
-  router/
-    router.js           # Rutas de Express para /api/services
-  app.js                # Punto de entrada, arranca el servidor
+    services.json          # Persistencia
+  routes/
+    services.router.js     # Endpoints de /api/services
+  app.js                   # Configura Express (middlewares y rutas)
+  server.js                # Levanta el servidor
 package.json
-.env_example
+.env.example
 .gitignore
 README.md
-```
-
-## Notas
-
-- El proyecto usa sintaxis ESM (`import`/`export`), habilitada con `"type": "module"` en `package.json`.
-- El archivo `.env` **no** se sube al repositorio (está en `.gitignore`); usar `.env_example` como referencia.
-
-AUTOR: Nehemias Deharbe
