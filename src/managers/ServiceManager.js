@@ -7,6 +7,11 @@ const SERVICES_PATH = join(__dirname, '..', 'data', 'services.json');
 
 const REQUIRED_FIELDS = ['name', 'description', 'duration', 'price', 'category', 'available'];
 
+/**
+ * ServiceManager
+ * Administra los servicios del sistema de turnos y reservas,
+ * persistiendo los datos en src/data/services.json.
+ */
 export default class ServiceManager {
   constructor(path = SERVICES_PATH) {
     this.path = path;
@@ -32,13 +37,55 @@ export default class ServiceManager {
     return maxId + 1;
   }
 
-  #validateRequiredFields(serviceData) {
-    return REQUIRED_FIELDS.filter((field) => {
-      const value = serviceData[field];
-      return value === undefined || value === null || value === '';
-    });
+  /**
+   * Valida presencia y tipo de los campos de un servicio.
+   * @returns {string[]} lista de mensajes de error (vacía si es válido)
+   */
+  #validateServiceData(serviceData, { partial = false } = {}) {
+    const errors = [];
+
+    for (const field of REQUIRED_FIELDS) {
+      if (!partial) {
+        const value = serviceData[field];
+        if (value === undefined || value === null || value === '') {
+          errors.push(`Falta el campo requerido: ${field}`);
+        }
+      }
+    }
+
+    if (
+      serviceData.duration !== undefined &&
+      (typeof serviceData.duration !== 'number' || Number.isNaN(serviceData.duration) || serviceData.duration <= 0)
+    ) {
+      errors.push('El campo "duration" debe ser un número mayor a 0');
+    }
+
+    if (
+      serviceData.price !== undefined &&
+      (typeof serviceData.price !== 'number' || Number.isNaN(serviceData.price) || serviceData.price < 0)
+    ) {
+      errors.push('El campo "price" debe ser un número mayor o igual a 0');
+    }
+
+    if (serviceData.name !== undefined && typeof serviceData.name !== 'string') {
+      errors.push('El campo "name" debe ser un texto');
+    }
+
+    if (serviceData.description !== undefined && typeof serviceData.description !== 'string') {
+      errors.push('El campo "description" debe ser un texto');
+    }
+
+    if (serviceData.category !== undefined && typeof serviceData.category !== 'string') {
+      errors.push('El campo "category" debe ser un texto');
+    }
+
+    if (serviceData.available !== undefined && typeof serviceData.available !== 'boolean') {
+      errors.push('El campo "available" debe ser true o false');
+    }
+
+    return errors;
   }
-  
+
   async getServices({ category, available } = {}) {
     let services = await this.#readServices();
 
@@ -65,11 +112,14 @@ export default class ServiceManager {
     if (!serviceData || typeof serviceData !== 'object') {
       throw new Error('Los datos del servicio son inválidos');
     }
-    const missing = this.#validateRequiredFields(serviceData);
-    if (missing.length > 0) {
-      throw new Error(`No se pudo crear el servicio, faltan campos requeridos: ${missing.join(', ')}`);
+
+    const errors = this.#validateServiceData(serviceData);
+    if (errors.length > 0) {
+      throw new Error(`No se pudo crear el servicio: ${errors.join('; ')}`);
     }
+
     const services = await this.#readServices();
+
     const newService = {
       id: this.#generateId(services),
       name: serviceData.name,
@@ -79,18 +129,39 @@ export default class ServiceManager {
       category: serviceData.category,
       available: serviceData.available,
     };
+
     services.push(newService);
     await this.#writeServices(services);
+
     return newService;
   }
 
+  /**
+   * Actualiza un servicio existente. Es un merge parcial (semántica tipo PATCH):
+   * solo pisa los campos que vengan en updatedData, el resto se conserva.
+   * No permite modificar el id.
+   */
   async updateService(id, updatedData) {
     const services = await this.#readServices();
     const index = services.findIndex((s) => String(s.id) === String(id));
-    if (index === -1) return null;
+
+    if (index === -1) {
+      return null;
+    }
 
     const { id: _ignoredId, ...safeData } = updatedData ?? {};
-    services[index] = { ...services[index], ...safeData, id: services[index].id };
+
+    const errors = this.#validateServiceData(safeData, { partial: true });
+    if (errors.length > 0) {
+      throw new Error(`No se pudo actualizar el servicio: ${errors.join('; ')}`);
+    }
+
+    services[index] = {
+      ...services[index],
+      ...safeData,
+      id: services[index].id,
+    };
+
     await this.#writeServices(services);
     return services[index];
   }
@@ -98,7 +169,10 @@ export default class ServiceManager {
   async deleteService(id) {
     const services = await this.#readServices();
     const index = services.findIndex((s) => String(s.id) === String(id));
-    if (index === -1) return null;
+
+    if (index === -1) {
+      return null;
+    }
 
     const [deleted] = services.splice(index, 1);
     await this.#writeServices(services);
