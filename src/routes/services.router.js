@@ -41,12 +41,11 @@ router.post('/', async (req, res) => {
     const newService = await serviceManager.addService(req.body);
     res.status(201).json(newService);
   } catch (error) {
-    // Datos incompletos o inválidos
     res.status(400).json({ error: error.message });
   }
 });
 
-// PUT /api/services/:sid
+// PUT /api/services/:sid  (merge parcial, semántica tipo PATCH — ver README)
 router.put('/:sid', async (req, res) => {
   try {
     const { sid } = req.params;
@@ -57,7 +56,7 @@ router.put('/:sid', async (req, res) => {
     }
     res.status(200).json(updated);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 });
 
