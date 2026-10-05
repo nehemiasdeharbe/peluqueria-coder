@@ -5,11 +5,6 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BOOKINGS_PATH = join(__dirname, '..', 'data', 'bookings.json');
 
-/**
- * BookingsDAO
- * Lee y escribe directamente en src/data/bookings.json.
- * No contiene reglas de negocio ni validaciones.
- */
 export default class BookingsDAO {
   constructor(path = BOOKINGS_PATH) {
     this.path = path;
@@ -48,7 +43,6 @@ export default class BookingsDAO {
     return bookings.find((b) => String(b.id) === String(id)) ?? null;
   }
 
-  // Pisa solo los campos recibidos; el id nunca se modifica. Devuelve null si no existe.
   async update(id, data) {
     const bookings = await this.#read();
     const index = bookings.findIndex((b) => String(b.id) === String(id));

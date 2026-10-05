@@ -5,12 +5,7 @@ import HttpError from '../utils/httpError.js';
 const REQUIRED_FIELDS = ['clientName', 'clientEmail', 'date', 'time'];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/**
- * BookingsService
- * Reglas de negocio de bookings: validaciones, verificación de que existan la reserva
- * y el servicio, e incremento de quantity cuando un servicio se agrega dos veces.
- * No conoce req/res ni archivos.
- */
+
 export default class BookingsService {
   constructor(
     bookingsRepository = new BookingsRepository(),
@@ -41,9 +36,7 @@ export default class BookingsService {
     return errors;
   }
 
-  /**
-   * Crea una reserva. Puede iniciarse con services vacío.
-   */
+
   async createBooking(bookingData) {
     if (!bookingData || typeof bookingData !== 'object') {
       throw new HttpError(400, 'Los datos de la reserva son inválidos');
@@ -73,12 +66,7 @@ export default class BookingsService {
     }
     return booking;
   }
-
-  /**
-   * Agrega un servicio a una reserva. Valida primero que exista la reserva y
-   * después el servicio. Si el servicio ya estaba agregado, incrementa su
-   * quantity en vez de duplicarlo (regla de negocio clave).
-   */
+  
   async addServiceToBooking(bookingId, serviceId) {
     const booking = await this.getBookingById(bookingId);
 

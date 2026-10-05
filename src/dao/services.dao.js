@@ -5,11 +5,6 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVICES_PATH = join(__dirname, '..', 'data', 'services.json');
 
-/**
- * ServicesDAO
- * Lee y escribe directamente en src/data/services.json.
- * No contiene reglas de negocio ni validaciones.
- */
 export default class ServicesDAO {
   constructor(path = SERVICES_PATH) {
     this.path = path;
@@ -52,7 +47,6 @@ export default class ServicesDAO {
     return newService;
   }
 
-  // Pisa solo los campos recibidos; el id nunca se modifica. Devuelve null si no existe.
   async update(id, data) {
     const services = await this.#read();
     const index = services.findIndex((s) => String(s.id) === String(id));
@@ -63,7 +57,6 @@ export default class ServicesDAO {
     return services[index];
   }
 
-  // Devuelve el servicio eliminado, o null si no existe.
   async delete(id) {
     const services = await this.#read();
     const index = services.findIndex((s) => String(s.id) === String(id));

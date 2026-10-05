@@ -3,20 +3,11 @@ import HttpError from '../utils/httpError.js';
 
 const REQUIRED_FIELDS = ['name', 'description', 'duration', 'price', 'category', 'available'];
 
-/**
- * ServicesService
- * Reglas de negocio de services: validaciones, filtros y semántica de PUT (merge parcial).
- * No conoce req/res ni archivos: habla solo con el repository.
- */
 export default class ServicesService {
   constructor(servicesRepository = new ServicesRepository()) {
     this.servicesRepository = servicesRepository;
   }
 
-  /**
-   * Valida presencia y tipo de los campos de un servicio.
-   * @returns {string[]} lista de mensajes de error (vacía si es válido)
-   */
   #validateServiceData(serviceData, { partial = false } = {}) {
     const errors = [];
 
@@ -101,7 +92,6 @@ export default class ServicesService {
       throw new HttpError(400, `No se pudo crear el servicio: ${errors.join('; ')}`);
     }
 
-    // Se arma el objeto campo por campo: un id enviado por el cliente se ignora
     const newService = {
       name: serviceData.name,
       description: serviceData.description,
@@ -114,11 +104,6 @@ export default class ServicesService {
     return this.servicesRepository.create(newService);
   }
 
-  /**
-   * Actualiza un servicio existente. Es un merge parcial (semántica tipo PATCH):
-   * solo pisa los campos que vengan en updatedData, el resto se conserva.
-   * No permite modificar el id.
-   */
   async updateService(id, updatedData) {
     await this.getServiceById(id); // 404 si no existe
 
