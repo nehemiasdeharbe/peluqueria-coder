@@ -93,7 +93,6 @@ Si falta alguna, la app no arranca y muestra un mensaje indicando cuál.
 
 | Método | Ruta                                   | Descripción                                      | Códigos     |
 |--------|------------------------------------------|---------------------------------------------------|-------------|
- 200         |
 | POST   | `/api/bookings`                          | Crea una reserva (`services` puede venir vacío)   | 201, 400    |
 | GET    | `/api/bookings/:bid`                     | Devuelve una reserva por id                       | 200, 404    |
 | POST   | `/api/bookings/:bid/services/:sid`       | Agrega un servicio a la reserva (o incrementa `quantity` si ya estaba) | 200, 404 |
@@ -151,29 +150,76 @@ curl -X POST http://localhost:8082/api/bookings/999/services/1
 { "error": "No existe una reserva con id 999" }
 ```
 
+## Arquitectura en capas
+
+El flujo de cada request atraviesa cinco capas, cada una con una única responsabilidad:
+
+```
+router → controller → service → repository → DAO → archivo JSON
+```
+
+| Capa       | Responsabilidad                                                                                         |
+|------------|----------------------------------------------------------------------------------------------------------|
+| Router     | Define los endpoints y los conecta con su controller.                                                    |
+| Controller | Lee `req`, llama al service y responde con `res`. Es la única capa que conoce `req` y `res`.              |
+| Service    | Contiene las reglas de negocio (validaciones, filtros, verificación de existencia, incremento de `quantity`). No conoce `req`/`res` ni los archivos. |
+| Repository | Ofrece métodos de acceso a datos (`getAll`, `getById`, `create`, `update`, `delete`). Sin reglas de negocio; delega en el DAO. |
+| DAO        | Lee y escribe directamente en el archivo JSON. Sin lógica de negocio.                                    |
+
+### Funciones por capa
+
+| Recurso    | Controller y service                                                                | Repository y DAO                          |
+|------------|--------------------------------------------------------------------------------------|--------------------------------------------|
+| `services` | `getServices`, `getServiceById`, `createService`, `updateService`, `deleteService`  | `getAll`, `getById`, `create`, `update`, `delete` |
+| `bookings` | `createBooking`, `getBookingById`, `addServiceToBooking`                            | `create`, `getById`, `update`              |
+
+### Regla de negocio clave
+
+Si el mismo servicio se agrega dos veces a una reserva, no se duplica: se incrementa `quantity`. Esa lógica vive en `BookingsService.addServiceToBooking` (`bookings.service.js`), nunca en el DAO. El service también valida, en este orden, que exista la reserva y luego el servicio, y responde `404` indicando cuál falta.
+
+### Manejo de errores
+
+Los services lanzan un `HttpError` (`src/utils/httpError.js`) con el código correspondiente (`400` o `404`). Los controllers lo traducen a `res.status(...).json({ error })`; cualquier otro error inesperado responde `500`. Así los services no necesitan conocer `res`.
+
+### Por qué esta estructura
+
+- Cada capa se puede leer, probar y cambiar de forma aislada.
+- Cambiar la persistencia (por ejemplo, de archivos JSON a MongoDB con Mongoose) solo requiere reemplazar el DAO y, si hace falta, el repository: los services y controllers no se tocan.
+- Los repositories reciben su DAO por constructor y los services su repository, lo que facilita reemplazarlos o simularlos en tests.
+
+Esta pre-entrega es un refactor interno: las URLs, los códigos de estado y las respuestas de los endpoints **no cambiaron** (los 21 tests existentes pasan sin modificaciones).
+
 ## Estructura
 
 ```
 src/
   config/
-    env.config.js            # Carga y valida variables de entorno
+    env.config.js              # Carga y valida variables de entorno
   controllers/
-    services.controller.js   # Lee req y responde res; usa ServiceManager
-    bookings.controller.js   # Lee req y responde res; usa BookingManager y ServiceManager
-  managers/
-    ServiceManager.js        # Lógica de datos de services (CRUD, filtros, validación)
-    BookingManager.js        # Lógica de datos de bookings (crear, buscar, agregar servicio)
-  data/
-    services.json            # Persistencia de services
-    bookings.json            # Persistencia de bookings
+    services.controller.js     # Lee req, llama al service y responde res
+    bookings.controller.js
+  services/
+    services.service.js        # Reglas de negocio de services (validación, filtros, PUT parcial)
+    bookings.service.js        # Reglas de negocio de bookings (existencia, quantity)
+  repositories/
+    services.repository.js     # Acceso a datos de services (delega en el DAO)
+    bookings.repository.js
+  dao/
+    services.dao.js            # Lee y escribe services.json
+    bookings.dao.js            # Lee y escribe bookings.json
   routes/
-    services.router.js       # Define los endpoints de /api/services y los conecta al controller
-    bookings.router.js       # Define los endpoints de /api/bookings y los conecta al controller
-  app.js                     # Configura Express (middlewares, rutas, manejo de errores)
-  server.js                  # Levanta el servidor
+    services.router.js         # Define los endpoints de /api/services
+    bookings.router.js         # Define los endpoints de /api/bookings
+  data/
+    services.json
+    bookings.json
+  utils/
+    httpError.js               # Error con código HTTP lanzado por los services
+  app.js                       # Configura Express (middlewares, rutas, manejo de errores)
+  server.js                    # Levanta el servidor
 tests/
-  services.test.js           # Tests de rutas de services
-  bookings.test.js           # Tests de rutas de bookings
+  services.test.js
+  bookings.test.js
 package.json
 .env.example
 .gitignore
@@ -184,5 +230,3 @@ README.md
 
 - El proyecto usa ESM (`import`/`export`), habilitado con `"type": "module"` en `package.json`.
 - `.env` no se sube al repositorio (está en `.gitignore`); `.env.example` trae valores reales listos para usar.
-- La API está organizada en tres capas: **routes** (solo definen endpoints), **controllers** (leen `req.params`, `req.query` y `req.body`, llaman al manager y responden con `res.status().json()`) y **managers** (lógica de datos sobre los JSON, sin usar `req` ni `res`).
-- `BookingManager` no importa `ServiceManager`: la validación de que un servicio exista antes de agregarlo a una reserva se hace en `bookings.controller.js`, para mantener cada manager enfocado en su propio recurso.

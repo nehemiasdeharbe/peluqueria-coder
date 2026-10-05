@@ -1,40 +1,16 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SERVICES_PATH = join(__dirname, '..', 'data', 'services.json');
+import ServicesRepository from '../repositories/services.repository.js';
+import HttpError from '../utils/httpError.js';
 
 const REQUIRED_FIELDS = ['name', 'description', 'duration', 'price', 'category', 'available'];
 
 /**
- * ServiceManager
- * Administra los servicios del sistema de turnos y reservas,
- * persistiendo los datos en src/data/services.json.
+ * ServicesService
+ * Reglas de negocio de services: validaciones, filtros y semántica de PUT (merge parcial).
+ * No conoce req/res ni archivos: habla solo con el repository.
  */
-export default class ServiceManager {
-  constructor(path = SERVICES_PATH) {
-    this.path = path;
-  }
-
-  async #readServices() {
-    try {
-      const data = await readFile(this.path, 'utf-8');
-      return JSON.parse(data);
-    } catch (error) {
-      if (error.code === 'ENOENT') return [];
-      throw new Error(`No se pudo leer el archivo de servicios: ${error.message}`);
-    }
-  }
-
-  async #writeServices(services) {
-    await writeFile(this.path, JSON.stringify(services, null, 2), 'utf-8');
-  }
-
-  #generateId(services) {
-    if (services.length === 0) return 1;
-    const maxId = Math.max(...services.map((s) => Number(s.id) || 0));
-    return maxId + 1;
+export default class ServicesService {
+  constructor(servicesRepository = new ServicesRepository()) {
+    this.servicesRepository = servicesRepository;
   }
 
   /**
@@ -44,8 +20,8 @@ export default class ServiceManager {
   #validateServiceData(serviceData, { partial = false } = {}) {
     const errors = [];
 
-    for (const field of REQUIRED_FIELDS) {
-      if (!partial) {
+    if (!partial) {
+      for (const field of REQUIRED_FIELDS) {
         const value = serviceData[field];
         if (value === undefined || value === null || value === '') {
           errors.push(`Falta el campo requerido: ${field}`);
@@ -87,7 +63,11 @@ export default class ServiceManager {
   }
 
   async getServices({ category, available } = {}) {
-    let services = await this.#readServices();
+    if (available !== undefined && available !== 'true' && available !== 'false') {
+      throw new HttpError(400, 'El filtro "available" debe ser true o false');
+    }
+
+    let services = await this.servicesRepository.getAll();
 
     if (category !== undefined) {
       services = services.filter(
@@ -96,7 +76,7 @@ export default class ServiceManager {
     }
 
     if (available !== undefined) {
-      const wanted = String(available) === 'true';
+      const wanted = available === 'true';
       services = services.filter((s) => s.available === wanted);
     }
 
@@ -104,24 +84,25 @@ export default class ServiceManager {
   }
 
   async getServiceById(id) {
-    const services = await this.#readServices();
-    return services.find((s) => String(s.id) === String(id)) ?? null;
+    const service = await this.servicesRepository.getById(id);
+    if (!service) {
+      throw new HttpError(404, `No existe un servicio con id ${id}`);
+    }
+    return service;
   }
 
-  async addService(serviceData) {
+  async createService(serviceData) {
     if (!serviceData || typeof serviceData !== 'object') {
-      throw new Error('Los datos del servicio son inválidos');
+      throw new HttpError(400, 'Los datos del servicio son inválidos');
     }
 
     const errors = this.#validateServiceData(serviceData);
     if (errors.length > 0) {
-      throw new Error(`No se pudo crear el servicio: ${errors.join('; ')}`);
+      throw new HttpError(400, `No se pudo crear el servicio: ${errors.join('; ')}`);
     }
 
-    const services = await this.#readServices();
-
+    // Se arma el objeto campo por campo: un id enviado por el cliente se ignora
     const newService = {
-      id: this.#generateId(services),
       name: serviceData.name,
       description: serviceData.description,
       duration: serviceData.duration,
@@ -130,10 +111,7 @@ export default class ServiceManager {
       available: serviceData.available,
     };
 
-    services.push(newService);
-    await this.#writeServices(services);
-
-    return newService;
+    return this.servicesRepository.create(newService);
   }
 
   /**
@@ -142,40 +120,23 @@ export default class ServiceManager {
    * No permite modificar el id.
    */
   async updateService(id, updatedData) {
-    const services = await this.#readServices();
-    const index = services.findIndex((s) => String(s.id) === String(id));
-
-    if (index === -1) {
-      return null;
-    }
+    await this.getServiceById(id); // 404 si no existe
 
     const { id: _ignoredId, ...safeData } = updatedData ?? {};
 
     const errors = this.#validateServiceData(safeData, { partial: true });
     if (errors.length > 0) {
-      throw new Error(`No se pudo actualizar el servicio: ${errors.join('; ')}`);
+      throw new HttpError(400, `No se pudo actualizar el servicio: ${errors.join('; ')}`);
     }
 
-    services[index] = {
-      ...services[index],
-      ...safeData,
-      id: services[index].id,
-    };
-
-    await this.#writeServices(services);
-    return services[index];
+    return this.servicesRepository.update(id, safeData);
   }
 
   async deleteService(id) {
-    const services = await this.#readServices();
-    const index = services.findIndex((s) => String(s.id) === String(id));
-
-    if (index === -1) {
-      return null;
+    const deleted = await this.servicesRepository.delete(id);
+    if (!deleted) {
+      throw new HttpError(404, `No existe un servicio con id ${id}`);
     }
-
-    const [deleted] = services.splice(index, 1);
-    await this.#writeServices(services);
     return deleted;
   }
 }
