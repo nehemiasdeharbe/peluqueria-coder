@@ -93,7 +93,7 @@ Si falta alguna, la app no arranca y muestra un mensaje indicando cuál.
 
 | Método | Ruta                                   | Descripción                                      | Códigos     |
 |--------|------------------------------------------|---------------------------------------------------|-------------|
-| GET    | `/api/bookings`                          | Lista todas las reservas (extra, no pedida)       | 200         |
+ 200         |
 | POST   | `/api/bookings`                          | Crea una reserva (`services` puede venir vacío)   | 201, 400    |
 | GET    | `/api/bookings/:bid`                     | Devuelve una reserva por id                       | 200, 404    |
 | POST   | `/api/bookings/:bid/services/:sid`       | Agrega un servicio a la reserva (o incrementa `quantity` si ya estaba) | 200, 404 |
@@ -157,20 +157,23 @@ curl -X POST http://localhost:8082/api/bookings/999/services/1
 src/
   config/
     env.config.js            # Carga y valida variables de entorno
+  controllers/
+    services.controller.js   # Lee req y responde res; usa ServiceManager
+    bookings.controller.js   # Lee req y responde res; usa BookingManager y ServiceManager
   managers/
-    ServiceManager.js        # Lógica de negocio de services (CRUD, filtros, validación)
-    BookingManager.js        # Lógica de negocio de bookings (crear, buscar, agregar servicio)
+    ServiceManager.js        # Lógica de datos de services (CRUD, filtros, validación)
+    BookingManager.js        # Lógica de datos de bookings (crear, buscar, agregar servicio)
   data/
     services.json            # Persistencia de services
-    bookings.json             # Persistencia de bookings
+    bookings.json            # Persistencia de bookings
   routes/
-    services.router.js       # Endpoints de /api/services
-    bookings.router.js       # Endpoints de /api/bookings
-  app.js                      # Configura Express (middlewares, rutas, manejo de errores)
-  server.js                   # Levanta el servidor
+    services.router.js       # Define los endpoints de /api/services y los conecta al controller
+    bookings.router.js       # Define los endpoints de /api/bookings y los conecta al controller
+  app.js                     # Configura Express (middlewares, rutas, manejo de errores)
+  server.js                  # Levanta el servidor
 tests/
-  services.test.js            # Tests de rutas de services
-  bookings.test.js            # Tests de rutas de bookings
+  services.test.js           # Tests de rutas de services
+  bookings.test.js           # Tests de rutas de bookings
 package.json
 .env.example
 .gitignore
@@ -181,4 +184,5 @@ README.md
 
 - El proyecto usa ESM (`import`/`export`), habilitado con `"type": "module"` en `package.json`.
 - `.env` no se sube al repositorio (está en `.gitignore`); `.env.example` trae valores reales listos para usar.
-- `BookingManager` no importa `ServiceManager`: la validación de que un servicio exista antes de agregarlo a una reserva se hace en `bookings.router.js`, para mantener cada manager enfocado en su propio recurso.
+- La API está organizada en tres capas: **routes** (solo definen endpoints), **controllers** (leen `req.params`, `req.query` y `req.body`, llaman al manager y responden con `res.status().json()`) y **managers** (lógica de datos sobre los JSON, sin usar `req` ni `res`).
+- `BookingManager` no importa `ServiceManager`: la validación de que un servicio exista antes de agregarlo a una reserva se hace en `bookings.controller.js`, para mantener cada manager enfocado en su propio recurso.
