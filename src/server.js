@@ -1,6 +1,8 @@
+import { createServer } from 'node:http';
 import app from './app.js';
 import env from './config/env.config.js';
 import { connectDB } from './config/db.config.js';
+import { initSocket } from './config/socket.config.js';
 
 try {
   await connectDB();
@@ -10,6 +12,9 @@ try {
   process.exit(1);
 }
 
-app.listen(env.port, () => {
+const httpServer = createServer(app);
+initSocket(httpServer, app);
+
+httpServer.listen(env.port, () => {
   console.log(`Servidor corriendo en http://localhost:${env.port} (${env.nodeEnv})`);
 });

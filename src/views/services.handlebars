@@ -1,0 +1,37 @@
+<h1>Servicios</h1>
+<p class="subtitle">Listado en vivo: los cambios hechos desde la API aparecen acá sin recargar la página.</p>
+
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Descripción</th>
+        <th>Duración</th>
+        <th>Precio</th>
+        <th>Categoría</th>
+        <th>Disponibilidad</th>
+      </tr>
+    </thead>
+    <tbody id="services-body">
+      {{#each services}}
+      <tr data-id="{{id}}">
+        <td>{{name}}</td>
+        <td>{{description}}</td>
+        <td>{{duration}} min</td>
+        <td>{{formatPrice price}}</td>
+        <td>{{category}}</td>
+        <td>
+          {{#if available}}
+          <span class="badge badge-ok">Disponible</span>
+          {{else}}
+          <span class="badge badge-off">No disponible</span>
+          {{/if}}
+        </td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</div>
+
+<p id="empty-message" class="empty"{{#if services.length}} hidden{{/if}}>Todavía no hay servicios cargados.</p>

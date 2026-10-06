@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}} | Peluquería Coder</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">Peluquería Coder</span>
+    <nav>
+      <a href="/views/services"{{#if servicesActive}} class="active"{{/if}}>Servicios</a>
+      <a href="/views/availability"{{#if availabilityActive}} class="active"{{/if}}>Disponibilidad</a>
+    </nav>
+  </header>
+
+  <div id="notice" class="notice" role="status" aria-live="polite"></div>
+
+  <main class="container">
+    {{{body}}}
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket.js"></script>
+</body>
+</html>

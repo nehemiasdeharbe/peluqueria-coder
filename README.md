@@ -1,6 +1,6 @@
 # Peluquería Coder - Sistema Backend de Turnos y Reservas
 
-API REST con Node.js, Express y persistencia en **MongoDB Atlas con Mongoose** que gestiona los recursos `services` (servicios de la peluquería) y `bookings` (reservas de los clientes). Incluye además el modelo `messages`.
+API REST con Node.js, Express y persistencia en **MongoDB Atlas con Mongoose** que gestiona los recursos `services` (servicios de la peluquería) y `bookings` (reservas de los clientes). Incluye además el modelo `messages`, **vistas renderizadas en el servidor con Handlebars** y **actualizaciones en tiempo real con Socket.io**.
 
 ## Instalación
 
@@ -38,7 +38,7 @@ Modo desarrollo (reinicia al guardar cambios):
 npm run dev
 ```
 
-El servidor conecta primero con MongoDB y recién después empieza a escuchar en `http://localhost:<PORT>`. Si la conexión falla, muestra el motivo (sin exponer la URI) y termina.
+El servidor conecta primero con MongoDB y recién después empieza a escuchar en `http://localhost:<PORT>` (Express y Socket.io comparten el mismo servidor HTTP). Si la conexión falla, muestra el motivo (sin exponer la URI) y termina.
 
 ## Tests
 
@@ -46,7 +46,7 @@ El servidor conecta primero con MongoDB y recién después empieza a escuchar en
 npm test
 ```
 
-Corre tests automatizados de las rutas con `node:test` y `supertest` (25 casos: servicios y reservas, incluyendo los códigos 200, 201, 400 y 404). Los tests usan **siempre una base aparte llamada `peluqueria_test`** dentro del mismo cluster, aunque `MONGO_URI` apunte a otra, y vacían sus colecciones al empezar y al terminar. Así nunca tocan los datos reales de la aplicación. Los archivos de tests corren en serie porque comparten esa base.
+Corre tests automatizados de las rutas con `node:test` y `supertest` (34 casos: servicios, reservas, vistas y eventos de Socket.io, incluyendo los códigos 200, 201, 400 y 404). Los tests usan **siempre una base aparte llamada `peluqueria_test`** dentro del mismo cluster, aunque `MONGO_URI` apunte a otra, y vacían sus colecciones al empezar y al terminar. Así nunca tocan los datos reales de la aplicación. Los archivos de tests corren en serie porque comparten esa base.
 
 ## Variables de entorno
 
@@ -174,6 +174,43 @@ curl -X POST http://localhost:8082/api/bookings/999/services/6702a1f4c3e1b2a9d8f
 { "error": "No existe una reserva con id 999" }
 ```
 
+## Vistas con Handlebars
+
+Express usa **Handlebars** (`express-handlebars`) como motor de vistas. Las vistas están en `src/views` y el layout común en `src/views/layouts/main.handlebars`.
+
+| Ruta                      | Descripción                                                                                      |
+|---------------------------|---------------------------------------------------------------------------------------------------|
+| `GET /views/services`     | Tabla con todos los servicios de la base: nombre, descripción, duración, precio, categoría y disponibilidad. |
+| `GET /views/availability` | Dos listados: servicios **disponibles** y **no disponibles**, con sus contadores.                |
+
+Ninguna vista tiene datos escritos a mano: el controller de vistas (`views.controller.js`) llama a los **mismos services que la API REST** (`ServicesService`) y pasa el resultado a la plantilla, así que el flujo sigue siendo `route → controller → service → repository → DAO → model`. El controller de vistas no contiene lógica de negocio. Los archivos estáticos (CSS y JS del navegador) se sirven desde `src/public`.
+
+## Tiempo real con Socket.io
+
+Socket.io está configurado en `src/config/socket.config.js` y se inicia en `server.js` sobre el mismo servidor HTTP de Express. Cuando una acción real del sistema modifica un servicio, el controller de la API emite un evento a todos los navegadores conectados:
+
+| Acción (API REST)            | Evento emitido    | Datos                    |
+|------------------------------|-------------------|--------------------------|
+| `POST /api/services`         | `service:created` | el servicio creado       |
+| `PUT /api/services/:sid`     | `service:updated` | el servicio actualizado  |
+| `DELETE /api/services/:sid`  | `service:deleted` | `{ id }` del eliminado   |
+
+Los eventos solo se emiten cuando la operación se completó con éxito (una petición inválida no emite nada). El cliente (`src/public/js/socket.js`) escucha esos tres eventos y actualiza la página **sin recargarla**:
+
+- En `/views/services` agrega, modifica o quita la fila correspondiente.
+- En `/views/availability` mueve el servicio de una lista a la otra cuando cambia su disponibilidad y actualiza los contadores.
+- En ambas muestra un aviso breve (por ejemplo, "Nuevo servicio: Corte").
+
+**Cómo probarlo:** abrí `http://localhost:8082/views/availability` en el navegador, y desde Postman o `curl` cambiá la disponibilidad de un servicio:
+
+```bash
+curl -X PUT http://localhost:8082/api/services/<ID_DEL_SERVICIO> \
+  -H "Content-Type: application/json" \
+  -d '{"available": false}'
+```
+
+El servicio pasa de "Disponibles" a "No disponibles" en la página abierta, sin recargar.
+
 ## Arquitectura en capas
 
 El flujo de cada request atraviesa cinco capas, cada una con una única responsabilidad:
@@ -189,6 +226,8 @@ router → controller → service → repository → DAO → MongoDB (Mongoose)
 | Service    | Contiene las reglas de negocio (validaciones, filtros, verificación de existencia, incremento de `quantity`). No conoce `req`/`res` ni la base de datos. |
 | Repository | Ofrece métodos de acceso a datos (`getAll`, `getById`, `create`, `update`, `delete`). Sin reglas de negocio; delega en el DAO. |
 | DAO        | Consulta y escribe directamente en MongoDB mediante los modelos de Mongoose. Sin lógica de negocio.       |
+
+Las vistas (`views.router.js` → `views.controller.js`) reutilizan los mismos services que la API REST, por lo que atraviesan las mismas capas.
 
 ### Funciones por capa
 
@@ -221,13 +260,15 @@ src/
   config/
     env.config.js              # Carga y valida variables de entorno (incluida MONGO_URI)
     db.config.js               # Conexión a MongoDB con Mongoose
+    socket.config.js           # Configuración de Socket.io sobre el servidor HTTP
   models/
     service.model.js           # Esquema de services
     booking.model.js           # Esquema de bookings (services: [{ service: ObjectId, quantity }])
     message.model.js           # Esquema de messages
   controllers/
-    services.controller.js     # Lee req, llama al service y responde res
-    bookings.controller.js
+    services.controller.js     # API de services: lee req, llama al service, responde y emite eventos
+    bookings.controller.js     # API de bookings
+    views.controller.js        # Renderiza las vistas usando los services existentes
   services/
     services.service.js        # Reglas de negocio de services (validación, filtros, PUT parcial)
     bookings.service.js        # Reglas de negocio de bookings (existencia, quantity)
@@ -238,17 +279,27 @@ src/
     services.dao.js            # Consulta y escribe la colección services (Mongoose)
     bookings.dao.js            # Consulta y escribe la colección bookings (Mongoose)
   routes/
-    services.router.js         # Define los endpoints de /api/services
-    bookings.router.js         # Define los endpoints de /api/bookings
+    services.router.js         # Endpoints de /api/services
+    bookings.router.js         # Endpoints de /api/bookings
+    views.router.js            # Endpoints de /views
+  views/
+    layouts/main.handlebars    # Layout común (navegación y scripts)
+    services.handlebars        # Listado de servicios
+    availability.handlebars    # Servicios disponibles / no disponibles
+  public/
+    css/styles.css             # Estilos de las vistas
+    js/socket.js               # Cliente de Socket.io: actualiza la página al recibir eventos
   utils/
     httpError.js               # Error con código HTTP lanzado por los services
     mongo.js                   # Validación de ids y conversión de documentos a objetos planos
-  app.js                       # Configura Express (middlewares, rutas, manejo de errores)
-  server.js                    # Conecta a MongoDB y levanta el servidor
+  app.js                       # Configura Express (Handlebars, estáticos, rutas, manejo de errores)
+  server.js                    # Conecta a MongoDB y levanta el servidor HTTP con Socket.io
 tests/
   helpers/db.js                # Conexión y limpieza de la base de tests
   services.test.js
   bookings.test.js
+  views.test.js                # Vistas con datos reales de la base
+  socket.test.js               # Eventos de Socket.io emitidos por acciones de la API
 package.json
 .env.example
 .gitignore
