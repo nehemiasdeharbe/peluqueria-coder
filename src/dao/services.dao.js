@@ -1,10 +1,39 @@
 import Service from '../models/service.model.js';
-import { isValidId, toPlain } from '../utils/mongo.js';
+import { escapeRegex, isValidId, toPlain } from '../utils/mongo.js';
+
+const buildQuery = ({ category, available } = {}) => {
+  const query = {};
+  if (category !== undefined) {
+    query.category = { $regex: `^${escapeRegex(category)}$`, $options: 'i' };
+  }
+  if (available !== undefined) {
+    query.available = available;
+  }
+  return query;
+};
+
+const buildSort = ({ sortBy, order } = {}) =>
+  sortBy ? { [sortBy]: order === 'desc' ? -1 : 1, _id: 1 } : { _id: 1 };
 
 export default class ServicesDAO {
-  async getAll() {
-    const services = await Service.find().sort({ _id: 1 }).lean();
+  async getAll(filter = {}) {
+    const services = await Service.find(buildQuery(filter)).sort({ _id: 1 }).lean();
     return services.map(toPlain);
+  }
+
+  async findPaginated({ filter = {}, sort = {}, page, limit }) {
+    const query = buildQuery(filter);
+
+    const [services, total] = await Promise.all([
+      Service.find(query)
+        .sort(buildSort(sort))
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Service.countDocuments(query),
+    ]);
+
+    return { items: services.map(toPlain), total };
   }
 
   async getById(id) {

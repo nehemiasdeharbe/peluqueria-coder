@@ -14,10 +14,14 @@ after(async () => {
   await teardownTestDB();
 });
 
-test('GET /api/services devuelve 200 y un array', async () => {
+test('GET /api/services devuelve 200, el listado y los metadatos de paginación', async () => {
   const res = await request.get('/api/services');
   assert.equal(res.status, 200);
-  assert.ok(Array.isArray(res.body));
+  assert.ok(Array.isArray(res.body.services));
+
+  for (const key of ['total', 'page', 'limit', 'totalPages', 'hasPrevPage', 'hasNextPage']) {
+    assert.ok(key in res.body, `falta el campo ${key}`);
+  }
 });
 
 test('GET /api/services?available=true devuelve solo disponibles', async () => {
@@ -27,8 +31,8 @@ test('GET /api/services?available=true devuelve solo disponibles', async () => {
 
   const res = await request.get('/api/services?available=true');
   assert.equal(res.status, 200);
-  assert.ok(res.body.length >= 1);
-  assert.ok(res.body.every((s) => s.available === true));
+  assert.ok(res.body.services.length >= 1);
+  assert.ok(res.body.services.every((s) => s.available === true));
 });
 
 test('GET /api/services?available=invalido devuelve 400', async () => {

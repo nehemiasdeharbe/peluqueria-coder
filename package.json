@@ -1,7 +1,7 @@
 {
   "name": "peluqueria-coder",
   "version": "1.0.0",
-  "description": "Sistema Backend de Turnos y Reservas - API REST con Express, MongoDB Atlas (Mongoose), vistas con Handlebars y tiempo real con Socket.io",
+  "description": "Sistema Backend de Turnos y Reservas - API REST con Express, MongoDB Atlas (Mongoose), validación con Zod, vistas con Handlebars y tiempo real con Socket.io",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -17,7 +17,8 @@
     "express": "^5.2.1",
     "express-handlebars": "^9.0.1",
     "mongoose": "^9.11.0",
-    "socket.io": "^4.8.4"
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "socket.io-client": "^4.8.4",

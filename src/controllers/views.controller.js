@@ -4,7 +4,7 @@ const servicesService = new ServicesService();
 
 export const getServicesView = async (req, res, next) => {
   try {
-    const services = await servicesService.getServices();
+    const services = await servicesService.listServices();
     res.render('services', { title: 'Servicios', servicesActive: true, services });
   } catch (error) {
     next(error);
@@ -14,8 +14,8 @@ export const getServicesView = async (req, res, next) => {
 export const getAvailabilityView = async (req, res, next) => {
   try {
     const [available, unavailable] = await Promise.all([
-      servicesService.getServices({ available: 'true' }),
-      servicesService.getServices({ available: 'false' }),
+      servicesService.listServices({ available: true }),
+      servicesService.listServices({ available: false }),
     ]);
     res.render('availability', {
       title: 'Disponibilidad',

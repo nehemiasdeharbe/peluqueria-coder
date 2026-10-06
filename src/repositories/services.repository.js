@@ -5,8 +5,12 @@ export default class ServicesRepository {
     this.dao = dao;
   }
 
-  getAll() {
-    return this.dao.getAll();
+  getAll(filter) {
+    return this.dao.getAll(filter);
+  }
+
+  findPaginated(options) {
+    return this.dao.findPaginated(options);
   }
 
   getById(id) {

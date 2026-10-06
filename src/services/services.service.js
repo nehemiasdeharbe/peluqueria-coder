@@ -1,77 +1,34 @@
 import ServicesRepository from '../repositories/services.repository.js';
 import HttpError from '../utils/httpError.js';
 
-const REQUIRED_FIELDS = ['name', 'description', 'duration', 'price', 'category', 'available'];
-
 export default class ServicesService {
   constructor(servicesRepository = new ServicesRepository()) {
     this.servicesRepository = servicesRepository;
   }
 
-  #validateServiceData(serviceData, { partial = false } = {}) {
-    const errors = [];
+  async getServices({ category, available, page = 1, limit = 10, sortBy, order = 'asc' } = {}) {
+    const { items, total } = await this.servicesRepository.findPaginated({
+      filter: { category, available },
+      sort: { sortBy, order },
+      page,
+      limit,
+    });
 
-    if (!partial) {
-      for (const field of REQUIRED_FIELDS) {
-        const value = serviceData[field];
-        if (value === undefined || value === null || value === '') {
-          errors.push(`Falta el campo requerido: ${field}`);
-        }
-      }
-    }
+    const totalPages = Math.ceil(total / limit);
 
-    if (
-      serviceData.duration !== undefined &&
-      (typeof serviceData.duration !== 'number' || Number.isNaN(serviceData.duration) || serviceData.duration <= 0)
-    ) {
-      errors.push('El campo "duration" debe ser un número mayor a 0');
-    }
-
-    if (
-      serviceData.price !== undefined &&
-      (typeof serviceData.price !== 'number' || Number.isNaN(serviceData.price) || serviceData.price < 0)
-    ) {
-      errors.push('El campo "price" debe ser un número mayor o igual a 0');
-    }
-
-    if (serviceData.name !== undefined && typeof serviceData.name !== 'string') {
-      errors.push('El campo "name" debe ser un texto');
-    }
-
-    if (serviceData.description !== undefined && typeof serviceData.description !== 'string') {
-      errors.push('El campo "description" debe ser un texto');
-    }
-
-    if (serviceData.category !== undefined && typeof serviceData.category !== 'string') {
-      errors.push('El campo "category" debe ser un texto');
-    }
-
-    if (serviceData.available !== undefined && typeof serviceData.available !== 'boolean') {
-      errors.push('El campo "available" debe ser true o false');
-    }
-
-    return errors;
+    return {
+      services: items,
+      total,
+      page,
+      limit,
+      totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    };
   }
 
-  async getServices({ category, available } = {}) {
-    if (available !== undefined && available !== 'true' && available !== 'false') {
-      throw new HttpError(400, 'El filtro "available" debe ser true o false');
-    }
-
-    let services = await this.servicesRepository.getAll();
-
-    if (category !== undefined) {
-      services = services.filter(
-        (s) => String(s.category).toLowerCase() === String(category).toLowerCase()
-      );
-    }
-
-    if (available !== undefined) {
-      const wanted = available === 'true';
-      services = services.filter((s) => s.available === wanted);
-    }
-
-    return services;
+  async listServices({ category, available } = {}) {
+    return this.servicesRepository.getAll({ category, available });
   }
 
   async getServiceById(id) {
@@ -83,38 +40,12 @@ export default class ServicesService {
   }
 
   async createService(serviceData) {
-    if (!serviceData || typeof serviceData !== 'object') {
-      throw new HttpError(400, 'Los datos del servicio son inválidos');
-    }
-
-    const errors = this.#validateServiceData(serviceData);
-    if (errors.length > 0) {
-      throw new HttpError(400, `No se pudo crear el servicio: ${errors.join('; ')}`);
-    }
-
-    const newService = {
-      name: serviceData.name,
-      description: serviceData.description,
-      duration: serviceData.duration,
-      price: serviceData.price,
-      category: serviceData.category,
-      available: serviceData.available,
-    };
-
-    return this.servicesRepository.create(newService);
+    return this.servicesRepository.create(serviceData);
   }
 
   async updateService(id, updatedData) {
-    await this.getServiceById(id); // 404 si no existe
-
-    const { id: _ignoredId, ...safeData } = updatedData ?? {};
-
-    const errors = this.#validateServiceData(safeData, { partial: true });
-    if (errors.length > 0) {
-      throw new HttpError(400, `No se pudo actualizar el servicio: ${errors.join('; ')}`);
-    }
-
-    return this.servicesRepository.update(id, safeData);
+    await this.getServiceById(id); 
+    return this.servicesRepository.update(id, updatedData);
   }
 
   async deleteService(id) {

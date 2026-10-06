@@ -7,3 +7,5 @@ export const toPlain = (doc) => {
   const { _id, __v, ...rest } = doc;
   return { id: String(_id), ...rest };
 };
+
+export const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

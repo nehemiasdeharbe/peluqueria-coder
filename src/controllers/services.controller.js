@@ -9,9 +9,9 @@ const notify = (req, event, payload) => req.app.get('io')?.emit(event, payload);
 
 export const getServices = async (req, res) => {
   try {
-    const { category, available } = req.query;
-    const services = await servicesService.getServices({ category, available });
-    res.status(200).json(services);
+    // Query ya validada y normalizada por el middleware (page, limit, order con valores por defecto)
+    const result = await servicesService.getServices(req.validated.query);
+    res.status(200).json(result);
   } catch (error) {
     sendError(res, error);
   }
@@ -28,7 +28,7 @@ export const getServiceById = async (req, res) => {
 
 export const createService = async (req, res) => {
   try {
-    const newService = await servicesService.createService(req.body);
+    const newService = await servicesService.createService(req.validated.body);
     notify(req, 'service:created', newService);
     res.status(201).json(newService);
   } catch (error) {
@@ -38,7 +38,7 @@ export const createService = async (req, res) => {
 
 export const updateService = async (req, res) => {
   try {
-    const updated = await servicesService.updateService(req.params.sid, req.body);
+    const updated = await servicesService.updateService(req.params.sid, req.validated.body);
     notify(req, 'service:updated', updated);
     res.status(200).json(updated);
   } catch (error) {

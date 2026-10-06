@@ -13,6 +13,10 @@ export default class BookingsRepository {
     return this.dao.getById(id);
   }
 
+  getByIdWithServices(id) {
+    return this.dao.getByIdWithServices(id);
+  }
+
   update(id, data) {
     return this.dao.update(id, data);
   }
