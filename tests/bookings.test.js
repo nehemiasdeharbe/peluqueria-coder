@@ -1,29 +1,28 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import supertest from 'supertest';
 import app from '../src/app.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SERVICES_PATH = join(__dirname, '..', 'src', 'data', 'services.json');
-const BOOKINGS_PATH = join(__dirname, '..', 'src', 'data', 'bookings.json');
+import { setupTestDB, teardownTestDB } from './helpers/db.js';
 
 const request = supertest(app);
-let originalServices;
-let originalBookings;
 let existingServiceId;
 
 before(async () => {
-  originalServices = await readFile(SERVICES_PATH, 'utf-8');
-  originalBookings = await readFile(BOOKINGS_PATH, 'utf-8');
-  existingServiceId = JSON.parse(originalServices)[0].id;
+  await setupTestDB();
+
+  const res = await request.post('/api/services').send({
+    name: 'Corte de pelo',
+    description: 'Corte clásico',
+    duration: 30,
+    price: 3000,
+    category: 'peluqueria',
+    available: true,
+  });
+  existingServiceId = res.body.id;
 });
 
 after(async () => {
-  await writeFile(SERVICES_PATH, originalServices, 'utf-8');
-  await writeFile(BOOKINGS_PATH, originalBookings, 'utf-8');
+  await teardownTestDB();
 });
 
 test('POST /api/bookings crea una reserva con services vacío (201)', async () => {
@@ -121,4 +120,29 @@ test('POST /api/bookings/:bid/services/:sid con servicio inexistente devuelve 40
 
   const res = await request.post(`/api/bookings/${createRes.body.id}/services/99999`);
   assert.equal(res.status, 404);
+});
+
+test('POST /api/bookings con un servicio inicial lo guarda como referencia', async () => {
+  const res = await request.post('/api/bookings').send({
+    clientName: 'Julia Sosa',
+    clientEmail: 'julia@mail.com',
+    date: '2026-12-01',
+    time: '10:00',
+    services: [{ service: existingServiceId, quantity: 2 }],
+  });
+
+  assert.equal(res.status, 201);
+  assert.deepEqual(res.body.services, [{ service: existingServiceId, quantity: 2 }]);
+});
+
+test('POST /api/bookings con un servicio inicial inexistente devuelve 400', async () => {
+  const res = await request.post('/api/bookings').send({
+    clientName: 'Hugo Paz',
+    clientEmail: 'hugo@mail.com',
+    date: '2026-12-02',
+    time: '12:00',
+    services: [{ service: '99999', quantity: 1 }],
+  });
+
+  assert.equal(res.status, 400);
 });

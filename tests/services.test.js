@@ -1,23 +1,17 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import supertest from 'supertest';
 import app from '../src/app.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SERVICES_PATH = join(__dirname, '..', 'src', 'data', 'services.json');
+import { setupTestDB, teardownTestDB } from './helpers/db.js';
 
 const request = supertest(app);
-let originalServices;
 
 before(async () => {
-  originalServices = await readFile(SERVICES_PATH, 'utf-8');
+  await setupTestDB();
 });
 
 after(async () => {
-  await writeFile(SERVICES_PATH, originalServices, 'utf-8');
+  await teardownTestDB();
 });
 
 test('GET /api/services devuelve 200 y un array', async () => {
@@ -27,8 +21,13 @@ test('GET /api/services devuelve 200 y un array', async () => {
 });
 
 test('GET /api/services?available=true devuelve solo disponibles', async () => {
+  const base = { description: 'Prueba de filtro', duration: 30, price: 1000, category: 'peluqueria' };
+  await request.post('/api/services').send({ ...base, name: 'Disponible', available: true });
+  await request.post('/api/services').send({ ...base, name: 'No disponible', available: false });
+
   const res = await request.get('/api/services?available=true');
   assert.equal(res.status, 200);
+  assert.ok(res.body.length >= 1);
   assert.ok(res.body.every((s) => s.available === true));
 });
 
@@ -141,4 +140,24 @@ test('DELETE /api/services/:sid elimina el servicio', async () => {
 test('DELETE /api/services/:sid con id inexistente devuelve 404', async () => {
   const res = await request.delete('/api/services/99999');
   assert.equal(res.status, 404);
+});
+
+test('GET /api/services/:sid con un id de formato inválido devuelve 404 (no 500)', async () => {
+  const res = await request.get('/api/services/abc');
+  assert.equal(res.status, 404);
+});
+
+test('PUT /api/services/:sid con body vacío devuelve el servicio sin cambios', async () => {
+  const createRes = await request.post('/api/services').send({
+    name: 'Sin cambios',
+    description: 'Original',
+    duration: 20,
+    price: 800,
+    category: 'peluqueria',
+    available: true,
+  });
+
+  const putRes = await request.put(`/api/services/${createRes.body.id}`).send({});
+  assert.equal(putRes.status, 200);
+  assert.deepEqual(putRes.body, createRes.body);
 });
