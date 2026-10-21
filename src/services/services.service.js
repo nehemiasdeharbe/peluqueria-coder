@@ -1,5 +1,6 @@
 import ServicesRepository from '../repositories/services.repository.js';
 import HttpError from '../utils/httpError.js';
+import { buildPaginationMeta } from '../utils/pagination.js';
 
 export default class ServicesService {
   constructor(servicesRepository = new ServicesRepository()) {
@@ -14,17 +15,7 @@ export default class ServicesService {
       limit,
     });
 
-    const totalPages = Math.ceil(total / limit);
-
-    return {
-      services: items,
-      total,
-      page,
-      limit,
-      totalPages,
-      hasPrevPage: page > 1,
-      hasNextPage: page < totalPages,
-    };
+    return { services: items, ...buildPaginationMeta({ total, page, limit }) };
   }
 
   async listServices({ category, available } = {}) {
@@ -44,7 +35,7 @@ export default class ServicesService {
   }
 
   async updateService(id, updatedData) {
-    await this.getServiceById(id); 
+    await this.getServiceById(id);
     return this.servicesRepository.update(id, updatedData);
   }
 

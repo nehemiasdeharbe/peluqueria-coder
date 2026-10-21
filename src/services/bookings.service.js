@@ -1,6 +1,7 @@
 import BookingsRepository from '../repositories/bookings.repository.js';
 import ServicesRepository from '../repositories/services.repository.js';
 import HttpError from '../utils/httpError.js';
+import { buildPaginationMeta } from '../utils/pagination.js';
 
 export default class BookingsService {
   constructor(
@@ -36,6 +37,16 @@ export default class BookingsService {
     };
 
     return this.bookingsRepository.create(newBooking);
+  }
+
+  async getBookings({ status, page = 1, limit = 10 } = {}) {
+    const { items, total } = await this.bookingsRepository.findPaginatedWithServices({
+      filter: { status },
+      page,
+      limit,
+    });
+
+    return { bookings: items, ...buildPaginationMeta({ total, page, limit }) };
   }
 
   async getBookingById(id) {

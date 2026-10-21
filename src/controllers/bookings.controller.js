@@ -1,34 +1,25 @@
 import BookingsService from '../services/bookings.service.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
 const bookingsService = new BookingsService();
 
-const sendError = (res, error) =>
-  res.status(error.status ?? 500).json({ error: error.message });
+export const createBooking = asyncHandler(async (req, res) => {
+  const newBooking = await bookingsService.createBooking(req.validated.body);
+  res.status(201).json(newBooking);
+});
 
-export const createBooking = async (req, res) => {
-  try {
-    const newBooking = await bookingsService.createBooking(req.validated.body);
-    res.status(201).json(newBooking);
-  } catch (error) {
-    sendError(res, error);
-  }
-};
+export const getBookings = asyncHandler(async (req, res) => {
+  const result = await bookingsService.getBookings(req.validated.query);
+  res.status(200).json(result);
+});
 
-export const getBookingById = async (req, res) => {
-  try {
-    const booking = await bookingsService.getBookingById(req.params.bid);
-    res.status(200).json(booking);
-  } catch (error) {
-    sendError(res, error);
-  }
-};
+export const getBookingById = asyncHandler(async (req, res) => {
+  const booking = await bookingsService.getBookingById(req.params.bid);
+  res.status(200).json(booking);
+});
 
-export const addServiceToBooking = async (req, res) => {
-  try {
-    const { bid, sid } = req.validated.params;
-    const updatedBooking = await bookingsService.addServiceToBooking(bid, sid);
-    res.status(200).json(updatedBooking);
-  } catch (error) {
-    sendError(res, error);
-  }
-};
+export const addServiceToBooking = asyncHandler(async (req, res) => {
+  const { bid, sid } = req.validated.params;
+  const updatedBooking = await bookingsService.addServiceToBooking(bid, sid);
+  res.status(200).json(updatedBooking);
+});

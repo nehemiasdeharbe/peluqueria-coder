@@ -4,12 +4,13 @@ import express from 'express';
 import { engine } from 'express-handlebars';
 import servicesRouter from './routes/services.router.js';
 import bookingsRouter from './routes/bookings.router.js';
+import messagesRouter from './routes/messages.router.js';
 import viewsRouter from './routes/views.router.js';
+import { notFoundHandler, errorHandler } from './middlewares/error.middleware.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-
 
 app.engine(
   'handlebars',
@@ -32,17 +33,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/services', servicesRouter);
 app.use('/api/bookings', bookingsRouter);
+app.use('/api/messages', messagesRouter);
 app.use('/views', viewsRouter);
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Ruta no encontrada' });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
-app.use((err, req, res, next) => {
-  if (err.type === 'entity.parse.failed') {
-    return res.status(400).json({ error: 'El body no es un JSON válido' });
-  }
-  res.status(500).json({ error: err.message });
-});
-
-export default app;;
+export default app;

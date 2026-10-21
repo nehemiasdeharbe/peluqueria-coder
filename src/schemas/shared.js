@@ -13,6 +13,13 @@ export const requiredText = (field, kind = 'campo') =>
     .trim()
     .min(1, { error: `${label(field, kind)} no puede estar vacío` });
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export const requiredEmail = (field) =>
+  requiredText(field).regex(EMAIL_REGEX, {
+    error: `${label(field, 'campo')} no tiene un formato válido`,
+  });
+
 export const requiredNumber = (field) =>
   z.number({
     error: byInput(`Falta el campo requerido: ${field}`, `${label(field, 'campo')} debe ser un número`),

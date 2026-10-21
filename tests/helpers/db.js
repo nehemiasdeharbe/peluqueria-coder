@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { connectDB, disconnectDB } from '../../src/config/db.config.js';
 import Service from '../../src/models/service.model.js';
 import Booking from '../../src/models/booking.model.js';
+import Message from '../../src/models/message.model.js';
 
 export const TEST_DB_NAME = 'peluqueria_test';
 
@@ -16,6 +17,7 @@ export async function setupTestDB() {
 export async function clearTestDB() {
   await Service.deleteMany({});
   await Booking.deleteMany({});
+  await Message.deleteMany({});
 }
 
 export async function teardownTestDB() {

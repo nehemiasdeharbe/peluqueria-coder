@@ -17,6 +17,10 @@ export default class BookingsRepository {
     return this.dao.getByIdWithServices(id);
   }
 
+  findPaginatedWithServices(options) {
+    return this.dao.findPaginatedWithServices(options);
+  }
+
   update(id, data) {
     return this.dao.update(id, data);
   }

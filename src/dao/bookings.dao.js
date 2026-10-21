@@ -1,6 +1,6 @@
 import Booking from '../models/booking.model.js';
 import '../models/service.model.js';
-import { isValidId, toPlain } from '../utils/mongo.js';
+import { escapeRegex, isValidId, toPlain } from '../utils/mongo.js';
 
 const serialize = (booking) => {
   const plain = toPlain(booking);
@@ -26,6 +26,9 @@ const serializePopulated = (booking) => {
   };
 };
 
+const buildQuery = ({ status } = {}) =>
+  status !== undefined ? { status: { $regex: `^${escapeRegex(status)}$`, $options: 'i' } } : {};
+
 export default class BookingsDAO {
   async create(data) {
     const booking = await Booking.create(data);
@@ -41,6 +44,22 @@ export default class BookingsDAO {
     if (!isValidId(id)) return null;
     const booking = await Booking.findById(id).populate('services.service').lean();
     return serializePopulated(booking);
+  }
+
+  async findPaginatedWithServices({ filter = {}, page, limit }) {
+    const query = buildQuery(filter);
+
+    const [bookings, total] = await Promise.all([
+      Booking.find(query)
+        .sort({ date: 1, time: 1, _id: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('services.service')
+        .lean(),
+      Booking.countDocuments(query),
+    ]);
+
+    return { items: bookings.map(serializePopulated), total };
   }
 
   async update(id, data) {

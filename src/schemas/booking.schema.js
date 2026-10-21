@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { requiredText, requiredNumber, objectId } from './shared.js';
+import { requiredText, requiredEmail, requiredNumber, objectId, queryInteger } from './shared.js';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -25,9 +24,7 @@ const bookingServiceItemSchema = z.object(
 export const createBookingSchema = z.object(
   {
     clientName: requiredText('clientName'),
-    clientEmail: requiredText('clientEmail').regex(EMAIL_REGEX, {
-      error: 'El campo "clientEmail" no tiene un formato válido',
-    }),
+    clientEmail: requiredEmail('clientEmail'),
     date: requiredText('date').refine(isRealDate, {
       error: 'El campo "date" debe tener formato YYYY-MM-DD y ser una fecha real',
     }),
@@ -41,4 +38,10 @@ export const createBookingSchema = z.object(
 export const addServiceToBookingSchema = z.object({
   bid: objectId('bid', 'parámetro'),
   sid: objectId('sid', 'parámetro'),
+});
+
+export const listBookingsQuerySchema = z.object({
+  status: requiredText('status', 'parámetro').optional(),
+  page: queryInteger('page', { min: 1, defaultValue: 1 }),
+  limit: queryInteger('limit', { min: 1, max: 100, defaultValue: 10 }),
 });
